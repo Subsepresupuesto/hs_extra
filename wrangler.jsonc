@@ -18,7 +18,7 @@
     {
       "binding": "DB",
       "database_name": "horas-extra-db",
-      "database_id": "REEMPLAZAR_DESPUES_DE_WRANGLER_D1_CREATE",
+      "database_id": "85aa32e3-d110-4e6b-aafd-5e0f9b83d5d4",
       "migrations_dir": "migrations",
     },
   ],
