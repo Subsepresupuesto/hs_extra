@@ -96,29 +96,17 @@ export default function RemitosClient({
     }
   }
 
-  async function handleConfirmar(id: number) {
+  async function handleAnular(id: number) {
     if (
       !confirm(
-        "¿Confirmar este remito? Una vez confirmado, esas horas quedan bloqueadas y no se pueden volver a incluir en otro remito."
+        "¿Anular este remito? Las horas que incluye van a quedar disponibles de nuevo para un remito nuevo."
       )
     )
       return;
-    const res = await fetch(`/api/remitos/${id}/confirmar`, { method: "POST" });
-    if (!res.ok) {
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      alert(data.error ?? "No se pudo confirmar.");
-      return;
-    }
-    recargar();
-  }
-
-  async function handleAnular(id: number) {
-    const motivo = prompt("Motivo de la anulación (obligatorio):");
-    if (!motivo) return;
     const res = await fetch(`/api/remitos/${id}/anular`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ motivo }),
+      body: JSON.stringify({}),
     });
     if (!res.ok) {
       const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -134,8 +122,9 @@ export default function RemitosClient({
         <h2 className="text-base font-semibold text-slate-900 mb-1">Generar remito</h2>
         <p className="text-sm text-slate-500 mb-4">
           Junta las horas del período elegido (que todavía no estén en otro remito) en un documento
-          único para mandar por GDE. Mientras esté en <b>borrador</b> se puede volver a imprimir o
-          anular libremente; al <b>confirmarlo</b> esas horas quedan bloqueadas para siempre.
+          único para mandar por GDE. <b>Al generarlo queda confirmado en el momento</b> y esas horas
+          quedan bloqueadas para siempre — no se pueden volver a incluir en otro remito. Si hay un
+          error, se puede anular y las horas vuelven a estar disponibles.
         </p>
         <form onSubmit={handleGenerar} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {esAdmin ? (
@@ -190,7 +179,7 @@ export default function RemitosClient({
               disabled={enviando}
               className="rounded-md bg-red-700 text-white text-sm font-medium px-4 py-2.5 hover:bg-red-800 disabled:opacity-60 w-full"
             >
-              {enviando ? "Generando..." : "Generar remito"}
+              {enviando ? "Generando..." : "Generar e imprimir remito"}
             </button>
           </div>
           {error && (
@@ -247,19 +236,6 @@ export default function RemitosClient({
                       >
                         Ver / imprimir
                       </a>
-                      {r.estado === "borrador" && (
-                        <>
-                          <button
-                            onClick={() => handleConfirmar(r.id)}
-                            className="text-xs text-emerald-700 hover:underline"
-                          >
-                            Confirmar
-                          </button>
-                          <button onClick={() => handleAnular(r.id)} className="text-xs text-red-700 hover:underline">
-                            Anular
-                          </button>
-                        </>
-                      )}
                       {r.estado === "confirmado" && (
                         <button onClick={() => handleAnular(r.id)} className="text-xs text-red-700 hover:underline">
                           Anular

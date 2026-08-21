@@ -12,8 +12,8 @@ type Usuario = {
 };
 
 const roleLabel: Record<Usuario["role"], string> = {
-  area: "Área",
-  carga: "Carga (solo cargar, sin ver nada)",
+  area: "Secretaría",
+  carga: "Oficina (solo carga)",
   admin: "Administración",
 };
 
@@ -136,14 +136,16 @@ export default function UsuariosClient() {
               onChange={(e) => setRole(e.target.value as Usuario["role"])}
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
             >
-              <option value="area">Área</option>
-              <option value="carga">Carga (solo cargar, sin ver nada)</option>
+              <option value="area">Secretaría</option>
+              <option value="carga">Oficina (solo carga)</option>
               <option value="admin">Administración</option>
             </select>
           </div>
           {(role === "area" || role === "carga") && (
             <div>
-              <label className="text-sm font-medium text-slate-700">Nombre del área</label>
+              <label className="text-sm font-medium text-slate-700">
+                Nombre de {role === "area" ? "la secretaría" : "la oficina"}
+              </label>
               <input
                 value={areaName}
                 onChange={(e) => setAreaName(e.target.value)}
@@ -182,7 +184,7 @@ export default function UsuariosClient() {
                 <tr className="text-left text-slate-500 border-b border-slate-200">
                   <th className="py-2 pr-4">Usuario</th>
                   <th className="py-2 pr-4">Rol</th>
-                  <th className="py-2 pr-4">Área</th>
+                  <th className="py-2 pr-4">Secretaría/Oficina</th>
                   <th className="py-2 pr-4">Estado</th>
                   <th className="py-2 pr-4"></th>
                 </tr>

@@ -7,23 +7,19 @@ import ImprimirButton from "./ImprimirButton";
 export default async function ImprimirConsolidadoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ area?: string; legajo?: string; desde?: string; hasta?: string }>;
+  searchParams: Promise<{ area?: string; desde?: string; hasta?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (user.role !== "admin") redirect("/area");
 
-  const { area, legajo, desde, hasta } = await searchParams;
+  const { area, desde, hasta } = await searchParams;
 
   const clauses: string[] = [];
   const params: (string | number)[] = [];
   if (area) {
     clauses.push("area = ?");
     params.push(area);
-  }
-  if (legajo) {
-    clauses.push("legajo LIKE ?");
-    params.push(`%${legajo}%`);
   }
   if (desde) {
     clauses.push("periodo >= ?");
@@ -68,7 +64,7 @@ export default async function ImprimirConsolidadoPage({
         <ImprimirButton />
       </div>
 
-      <h1>Listado consolidado de horas extra</h1>
+      <h1>Listado de horas extra</h1>
       <p className="sub">
         Período: {desde || "inicio"} a {hasta || "actualidad"}
         {area ? ` · Área: ${area}` : ""} · Generado: {generado}
@@ -84,6 +80,7 @@ export default async function ImprimirConsolidadoPage({
             <th>50%</th>
             <th>100%</th>
             <th>Motivo</th>
+            <th>Cargado por</th>
           </tr>
         </thead>
         <tbody>
@@ -98,6 +95,7 @@ export default async function ImprimirConsolidadoPage({
               <td>{f.horas50}</td>
               <td>{f.horas100}</td>
               <td>{f.motivo}</td>
+              <td>{f.cargadoPorUsuario}</td>
             </tr>
           ))}
         </tbody>
@@ -106,6 +104,7 @@ export default async function ImprimirConsolidadoPage({
             <td colSpan={4}>TOTAL</td>
             <td>{total50}</td>
             <td>{total100}</td>
+            <td></td>
             <td></td>
           </tr>
         </tfoot>

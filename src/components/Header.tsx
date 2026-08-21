@@ -2,8 +2,8 @@ import LogoutButton from "@/components/LogoutButton";
 import type { SessionUser } from "@/lib/auth";
 
 const roleLabel: Record<SessionUser["role"], string> = {
-  area: "Área",
-  carga: "Carga",
+  area: "Secretaría",
+  carga: "Oficina",
   admin: "Administración",
 };
 

@@ -58,7 +58,9 @@ export default async function ImprimirRemitoPage({ params }: { params: Promise<{
         {remito.estado === "confirmado" &&
           ` · Confirmado por ${remito.confirmadoPorUsuario} el ${remito.confirmadoAt}`}
         {remito.estado === "anulado" &&
-          ` · Anulado por ${remito.anuladoPorUsuario} el ${remito.anuladoAt} (motivo: ${remito.motivoAnulacion})`}
+          ` · Anulado por ${remito.anuladoPorUsuario} el ${remito.anuladoAt}${
+            remito.motivoAnulacion ? ` (motivo: ${remito.motivoAnulacion})` : ""
+          }`}
       </p>
       <p className={`estado ${remito.estado}`}>{estadoLabel[remito.estado]}</p>
 
@@ -72,6 +74,7 @@ export default async function ImprimirRemitoPage({ params }: { params: Promise<{
             <th>50%</th>
             <th>100%</th>
             <th>Motivo</th>
+            <th>Cargado por</th>
           </tr>
         </thead>
         <tbody>
@@ -86,6 +89,7 @@ export default async function ImprimirRemitoPage({ params }: { params: Promise<{
               <td>{f.horas50}</td>
               <td>{f.horas100}</td>
               <td>{f.motivo}</td>
+              <td>{f.cargadoPorUsuario}</td>
             </tr>
           ))}
         </tbody>
@@ -94,6 +98,7 @@ export default async function ImprimirRemitoPage({ params }: { params: Promise<{
             <td colSpan={4}>TOTAL</td>
             <td>{total50}</td>
             <td>{total100}</td>
+            <td></td>
             <td></td>
           </tr>
         </tfoot>

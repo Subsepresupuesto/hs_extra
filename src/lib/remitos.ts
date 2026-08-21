@@ -50,13 +50,16 @@ export async function crearRemito(params: {
     };
   }
 
+  // El remito queda confirmado (y las horas bloqueadas) apenas se genera:
+  // el momento en que se manda a imprimir/GDE es el momento en que se confirma.
   const inserted = await dbRun(
-    `INSERT INTO remitos (area, desde, hasta, estado, creado_por, creado_por_usuario)
-     VALUES (?, ?, ?, 'borrador', ?, ?)`,
+    `INSERT INTO remitos (area, desde, hasta, estado, creado_por, creado_por_usuario, confirmado_por_usuario, confirmado_at)
+     VALUES (?, ?, ?, 'confirmado', ?, ?, ?, datetime('now'))`,
     area,
     desde,
     hasta,
     userId,
+    username,
     username
   );
   const remitoId = inserted.lastRowId;
@@ -107,27 +110,10 @@ export async function itemsRemito(id: number): Promise<FilaExport[]> {
   );
 }
 
-export async function confirmarRemito(
-  id: number,
-  username: string
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const remito = await obtenerRemito(id);
-  if (!remito) return { ok: false, error: "El remito no existe." };
-  if (remito.estado !== "borrador") {
-    return { ok: false, error: "Ese remito ya fue confirmado o anulado." };
-  }
-  await dbRun(
-    "UPDATE remitos SET estado = 'confirmado', confirmado_por_usuario = ?, confirmado_at = datetime('now') WHERE id = ?",
-    username,
-    id
-  );
-  return { ok: true };
-}
-
 export async function anularRemito(
   id: number,
   username: string,
-  motivo: string
+  motivo: string | null
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const remito = await obtenerRemito(id);
   if (!remito) return { ok: false, error: "El remito no existe." };

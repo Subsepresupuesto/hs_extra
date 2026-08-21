@@ -10,7 +10,7 @@ export default async function AreaLayout({ children }: { children: React.ReactNo
     user.role === "admin"
       ? [
           { href: "/area", label: "Cargar horas" },
-          { href: "/admin/consolidado", label: "Listado consolidado" },
+          { href: "/admin/consolidado", label: "Listado" },
           { href: "/remitos", label: "Remitos" },
           { href: "/admin", label: "Topes" },
           { href: "/admin/liberar", label: "Liberar legajos" },

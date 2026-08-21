@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
-import { dbGet, dbRun } from "@/lib/db";
+import { dbAll, dbBatch, dbGet } from "@/lib/db";
 import { parsearPlantilla } from "@/lib/excel";
-import {
-  chequearVentanaCarga,
-  getLimites,
-  getVentanaCarga,
-  periodoDeFecha,
-  totalesLegajoPeriodo,
-  legajoLiberado,
-} from "@/lib/hours";
+import { chequearVentanaCarga, getLimites, getVentanaCarga, periodoDeFecha } from "@/lib/hours";
 
 export async function POST(req: NextRequest) {
   const auth = await requireRole(["area", "carga", "admin"]);
@@ -61,29 +54,68 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "El archivo no tiene filas para cargar." }, { status: 400 });
   }
 
-  const limites = await getLimites();
-  // Totales corridos por (legajo, periodo) para validar acumulados dentro del mismo archivo.
-  const acumulado = new Map<string, { h50: number; h100: number }>();
+  const errores: { fila: number; motivo: string }[] = [];
 
-  const insertados: number[] = [];
-  const rechazados: { fila: number; motivo: string }[] = [];
+  // Traer de una sola vez todo lo que hace falta para validar (evita N consultas por fila).
+  const periodosUnicos = [...new Set(filas.filter((f) => !f.errorFormato).map((f) => periodoDeFecha(f.fecha)))];
+  const existentes =
+    periodosUnicos.length > 0
+      ? await dbAll<{ legajo: string; periodo: string; area: string; horas50: number; horas100: number }>(
+          `SELECT legajo, periodo, area, horas_50 as horas50, horas_100 as horas100
+           FROM horas_extra WHERE periodo IN (${periodosUnicos.map(() => "?").join(",")})`,
+          ...periodosUnicos
+        )
+      : [];
+  const liberados = await dbAll<{ legajo: string; periodo: string | null }>(
+    "SELECT legajo, periodo FROM legajos_liberados WHERE activo = 1"
+  );
+  const limites = await getLimites();
+
+  const sumaExistente = new Map<string, { h50: number; h100: number }>();
+  const yaEnEstaArea = new Set<string>();
+  for (const e of existentes) {
+    const clave = `${e.legajo}|${e.periodo}`;
+    const acc = sumaExistente.get(clave) ?? { h50: 0, h100: 0 };
+    acc.h50 += e.horas50;
+    acc.h100 += e.horas100;
+    sumaExistente.set(clave, acc);
+    if (e.area === area) yaEnEstaArea.add(clave);
+  }
+  function estaLiberado(legajo: string, periodo: string) {
+    return liberados.some((l) => l.legajo === legajo && (l.periodo === periodo || l.periodo === null));
+  }
+
+  const vistosEnArchivo = new Set<string>();
+  const filasValidas: (typeof filas)[number][] = [];
 
   for (const f of filas) {
     if (f.errorFormato) {
-      rechazados.push({ fila: f.fila, motivo: f.errorFormato });
+      errores.push({ fila: f.fila, motivo: f.errorFormato });
       continue;
     }
 
     const periodo = periodoDeFecha(f.fecha);
-    const clave = `${f.legajo}__${periodo}`;
-    let base = acumulado.get(clave);
-    if (!base) {
-      base = await totalesLegajoPeriodo(f.legajo, periodo);
-      acumulado.set(clave, base);
+    const clave = `${f.legajo}|${periodo}`;
+
+    if (vistosEnArchivo.has(clave)) {
+      errores.push({
+        fila: f.fila,
+        motivo: `El legajo ${f.legajo} aparece más de una vez en el archivo para ${periodo}. Solo se puede cargar una vez por mes (una por oficina si tiene más de un cargo).`,
+      });
+      continue;
+    }
+    vistosEnArchivo.add(clave);
+
+    if (yaEnEstaArea.has(clave)) {
+      errores.push({
+        fila: f.fila,
+        motivo: `Ya se cargaron horas para el legajo ${f.legajo} en ${periodo} desde esta área/oficina.`,
+      });
+      continue;
     }
 
-    const liberado = await legajoLiberado(f.legajo, periodo);
-    if (!liberado) {
+    if (!estaLiberado(f.legajo, periodo)) {
+      const base = sumaExistente.get(clave) ?? { h50: 0, h100: 0 };
       const total50 = base.h50 + f.horas50;
       const total100 = base.h100 + f.horas100;
       const totalCombinado = total50 + total100;
@@ -93,37 +125,42 @@ export async function POST(req: NextRequest) {
       if (limites.limiteCombinado > 0 && totalCombinado > limites.limiteCombinado)
         excesos.push(`combinado (${totalCombinado.toFixed(2)}/${limites.limiteCombinado})`);
       if (excesos.length > 0) {
-        rechazados.push({
-          fila: f.fila,
-          motivo: `Supera el tope mensual en: ${excesos.join("; ")}.`,
-        });
+        errores.push({ fila: f.fila, motivo: `Supera el tope mensual en: ${excesos.join("; ")}.` });
         continue;
       }
     }
 
-    await dbRun(
-      `INSERT INTO horas_extra
-        (legajo, nombre, apellido, area, fecha, periodo, horas_50, horas_100, motivo, cargado_por, cargado_por_usuario)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      f.legajo,
-      f.nombre,
-      f.apellido,
-      area,
-      f.fecha,
-      periodo,
-      f.horas50,
-      f.horas100,
-      f.motivo,
-      user.id,
-      user.username
-    );
-    base.h50 += f.horas50;
-    base.h100 += f.horas100;
-    insertados.push(f.fila);
+    filasValidas.push(f);
   }
 
-  return NextResponse.json({
-    insertados: insertados.length,
-    rechazados,
-  });
+  // Todo o nada: si hay algún error, no se carga ninguna fila.
+  if (errores.length > 0) {
+    return NextResponse.json(
+      { error: "El archivo tiene filas con problemas. No se cargó nada.", rechazados: errores },
+      { status: 400 }
+    );
+  }
+
+  await dbBatch(
+    filasValidas.map((f) => ({
+      sql: `INSERT INTO horas_extra
+        (legajo, nombre, apellido, area, fecha, periodo, horas_50, horas_100, motivo, cargado_por, cargado_por_usuario)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      params: [
+        f.legajo,
+        f.nombre,
+        f.apellido,
+        area,
+        f.fecha,
+        periodoDeFecha(f.fecha),
+        f.horas50,
+        f.horas100,
+        f.motivo,
+        user.id,
+        user.username,
+      ],
+    }))
+  );
+
+  return NextResponse.json({ insertados: filasValidas.length, rechazados: [] });
 }

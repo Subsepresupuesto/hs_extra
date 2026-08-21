@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Registro = {
   id: number;
@@ -37,6 +37,7 @@ export default function AreaClient({
   const esAdmin = rol === "admin";
   const esCarga = rol === "carga";
   const mesActual = mesActualIso();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [registros, setRegistros] = useState<Registro[]>([]);
   const [cargandoLista, setCargandoLista] = useState(true);
@@ -59,7 +60,6 @@ export default function AreaClient({
   const [resultadoBulk, setResultadoBulk] = useState<{ insertados: number; rechazados: { fila: number; motivo: string }[] } | null>(null);
 
   function recargar() {
-    if (esCarga) return;
     setCargandoLista(true);
     fetch("/api/horas")
       .then((r) => r.json() as Promise<{ registros: Registro[] }>)
@@ -71,7 +71,6 @@ export default function AreaClient({
   }
 
   useEffect(() => {
-    if (esCarga) return;
     const controller = new AbortController();
     fetch("/api/horas", { signal: controller.signal })
       .then((r) => r.json() as Promise<{ registros: Registro[] }>)
@@ -81,7 +80,6 @@ export default function AreaClient({
       })
       .catch(() => {});
     return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const legajoConsulta = legajo.trim();
@@ -199,11 +197,13 @@ export default function AreaClient({
         rechazados: { fila: number; motivo: string }[];
       };
       if (!res.ok) {
-        alert(data.error ?? "No se pudo procesar el archivo.");
+        setResultadoBulk({ insertados: 0, rechazados: data.rechazados ?? [] });
+        if (!data.rechazados?.length) alert(data.error ?? "No se pudo procesar el archivo.");
         return;
       }
       setResultadoBulk(data);
       setArchivo(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       recargar();
     } finally {
       setSubiendo(false);
@@ -344,7 +344,8 @@ export default function AreaClient({
       <section className="bg-white border border-slate-200 rounded-xl p-6">
         <h2 className="text-base font-semibold text-slate-900 mb-2">Carga masiva por Excel</h2>
         <p className="text-sm text-slate-500 mb-4">
-          Descargá la plantilla, completala y subila para cargar varios registros a la vez.{" "}
+          Descargá la plantilla, completala y subila para cargar varios registros a la vez. Si alguna
+          fila tiene un error, no se carga ninguna — hay que corregir el archivo y volver a subirlo.{" "}
           <a href="/api/plantilla" className="text-red-700 underline font-medium">
             Descargar plantilla
           </a>
@@ -366,25 +367,38 @@ export default function AreaClient({
             </select>
           )}
           <input
+            ref={fileInputRef}
             type="file"
             accept=".xlsx"
             onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
-            className="text-sm"
+            className="hidden"
           />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="rounded-md bg-slate-100 text-slate-900 text-sm font-medium px-4 py-2 hover:bg-slate-200"
+          >
+            Elegir archivo
+          </button>
+          <span className="text-sm text-slate-500">{archivo ? archivo.name : "Ningún archivo elegido"}</span>
           <button
             type="submit"
             disabled={!archivo || subiendo}
-            className="rounded-md bg-slate-100 text-slate-900 text-sm font-medium px-4 py-2 hover:bg-slate-200 disabled:opacity-60"
+            className="rounded-md bg-red-700 text-white text-sm font-medium px-4 py-2 hover:bg-red-800 disabled:opacity-60"
           >
-            {subiendo ? "Procesando..." : "Subir archivo"}
+            {subiendo ? "Cargando..." : "Cargar archivo"}
           </button>
         </form>
         {resultadoBulk && (
           <div className="mt-4 text-sm space-y-2">
-            <p className="text-emerald-700">{resultadoBulk.insertados} filas cargadas correctamente.</p>
+            {resultadoBulk.insertados > 0 && (
+              <p className="text-emerald-700">{resultadoBulk.insertados} filas cargadas correctamente.</p>
+            )}
             {resultadoBulk.rechazados.length > 0 && (
               <div className="text-red-700">
-                <p className="font-medium">{resultadoBulk.rechazados.length} filas rechazadas:</p>
+                <p className="font-medium">
+                  El archivo tiene {resultadoBulk.rechazados.length} fila(s) con problemas — no se cargó nada:
+                </p>
                 <ul className="list-disc list-inside">
                   {resultadoBulk.rechazados.map((r) => (
                     <li key={r.fila}>
@@ -398,60 +412,60 @@ export default function AreaClient({
         )}
       </section>
 
-      {!esCarga && (
-        <section className="bg-white border border-slate-200 rounded-xl p-6">
-          <h2 className="text-base font-semibold text-slate-900 mb-4">
-            {esAdmin ? "Cargas recientes" : "Cargas de tu área"}
-          </h2>
-          {cargandoLista ? (
-            <p className="text-sm text-slate-500">Cargando...</p>
-          ) : registros.length === 0 ? (
-            <p className="text-sm text-slate-500">Todavía no hay cargas.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-slate-500 border-b border-slate-200">
-                    {esAdmin && <th className="py-2 pr-4">Área</th>}
-                    <th className="py-2 pr-4">Legajo</th>
-                    <th className="py-2 pr-4">Nombre</th>
-                    <th className="py-2 pr-4">Mes</th>
-                    <th className="py-2 pr-4">50%</th>
-                    <th className="py-2 pr-4">100%</th>
-                    <th className="py-2 pr-4">Motivo</th>
-                    <th className="py-2 pr-4"></th>
+      <section className="bg-white border border-slate-200 rounded-xl p-6">
+        <h2 className="text-base font-semibold text-slate-900 mb-4">
+          {esAdmin ? "Cargas recientes" : "Cargas de tu área/oficina"}
+        </h2>
+        {cargandoLista ? (
+          <p className="text-sm text-slate-500">Cargando...</p>
+        ) : registros.length === 0 ? (
+          <p className="text-sm text-slate-500">Todavía no hay cargas.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-500 border-b border-slate-200">
+                  {esAdmin && <th className="py-2 pr-4">Área</th>}
+                  <th className="py-2 pr-4">Legajo</th>
+                  <th className="py-2 pr-4">Nombre</th>
+                  <th className="py-2 pr-4">Mes</th>
+                  <th className="py-2 pr-4">50%</th>
+                  <th className="py-2 pr-4">100%</th>
+                  <th className="py-2 pr-4">Motivo</th>
+                  <th className="py-2 pr-4">Cargado por</th>
+                  <th className="py-2 pr-4"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {registros.map((r) => (
+                  <tr key={r.id} className="border-b border-slate-100">
+                    {esAdmin && <td className="py-2 pr-4">{r.area}</td>}
+                    <td className="py-2 pr-4">{r.legajo}</td>
+                    <td className="py-2 pr-4">
+                      {r.nombre} {r.apellido}
+                    </td>
+                    <td className="py-2 pr-4">{r.fecha.slice(0, 7)}</td>
+                    <td className="py-2 pr-4">{r.horas50}</td>
+                    <td className="py-2 pr-4">{r.horas100}</td>
+                    <td className="py-2 pr-4 text-slate-500">{r.motivo}</td>
+                    <td className="py-2 pr-4 text-slate-500">{r.cargadoPorUsuario}</td>
+                    <td className="py-2 pr-4 text-right">
+                      {!esCarga && (esAdmin || r.createdAt.slice(0, 10) === hoy) && (
+                        <button
+                          onClick={() => handleEliminar(r.id)}
+                          className="text-red-700 hover:underline text-xs"
+                        >
+                          Eliminar
+                        </button>
+                      )}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {registros.map((r) => (
-                    <tr key={r.id} className="border-b border-slate-100">
-                      {esAdmin && <td className="py-2 pr-4">{r.area}</td>}
-                      <td className="py-2 pr-4">{r.legajo}</td>
-                      <td className="py-2 pr-4">
-                        {r.nombre} {r.apellido}
-                      </td>
-                      <td className="py-2 pr-4">{r.fecha.slice(0, 7)}</td>
-                      <td className="py-2 pr-4">{r.horas50}</td>
-                      <td className="py-2 pr-4">{r.horas100}</td>
-                      <td className="py-2 pr-4 text-slate-500">{r.motivo}</td>
-                      <td className="py-2 pr-4 text-right">
-                        {(esAdmin || r.createdAt.slice(0, 10) === hoy) && (
-                          <button
-                            onClick={() => handleEliminar(r.id)}
-                            className="text-red-700 hover:underline text-xs"
-                          >
-                            Eliminar
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      )}
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

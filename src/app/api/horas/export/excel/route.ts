@@ -9,7 +9,6 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const area = searchParams.get("area");
-  const legajo = searchParams.get("legajo");
   const desde = searchParams.get("desde");
   const hasta = searchParams.get("hasta");
 
@@ -18,10 +17,6 @@ export async function GET(req: NextRequest) {
   if (area) {
     clauses.push("area = ?");
     params.push(area);
-  }
-  if (legajo) {
-    clauses.push("legajo LIKE ?");
-    params.push(`%${legajo}%`);
   }
   if (desde) {
     clauses.push("periodo >= ?");
@@ -41,7 +36,7 @@ export async function GET(req: NextRequest) {
     ...params
   );
 
-  const titulo = `Listado consolidado de horas extra${desde || hasta ? ` (${desde ?? "..."} a ${hasta ?? "..."})` : ""}`;
+  const titulo = `Listado de horas extra${desde || hasta ? ` (${desde ?? "..."} a ${hasta ?? "..."})` : ""}`;
   const buffer = await generarExportExcel(filas, titulo);
 
   return new NextResponse(new Uint8Array(buffer), {

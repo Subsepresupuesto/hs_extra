@@ -24,3 +24,13 @@ export async function dbRun(sql: string, ...params: unknown[]): Promise<{ lastRo
   const result = await db.prepare(sql).bind(...params).run();
   return { lastRowId: result.meta.last_row_id };
 }
+
+// Ejecuta varias sentencias en un solo viaje de red (D1 .batch()), mucho más
+// rápido que awaitear cada una por separado. Todas se ejecutan igual, no se
+// interrumpen entre sí si una falla.
+export async function dbBatch(statements: { sql: string; params: unknown[] }[]): Promise<void> {
+  if (statements.length === 0) return;
+  const db = await getDb();
+  const prepared = statements.map((s) => db.prepare(s.sql).bind(...s.params));
+  await db.batch(prepared);
+}

@@ -87,6 +87,16 @@ export async function totalesLegajoPeriodo(legajo: string, periodo: string) {
   return row ?? { h50: 0, h100: 0 };
 }
 
+export async function yaCargado(legajo: string, periodo: string, area: string): Promise<boolean> {
+  const row = await dbGet(
+    "SELECT id FROM horas_extra WHERE legajo = ? AND periodo = ? AND area = ? LIMIT 1",
+    legajo,
+    periodo,
+    area
+  );
+  return !!row;
+}
+
 export async function legajoLiberado(legajo: string, periodo: string): Promise<boolean> {
   const row = await dbGet(
     `SELECT id FROM legajos_liberados

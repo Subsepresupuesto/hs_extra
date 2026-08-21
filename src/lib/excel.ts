@@ -11,13 +11,10 @@ export const PLANTILLA_HEADERS = [
 ];
 
 export async function generarPlantilla(): Promise<Buffer> {
-  const hoy = new Date();
-  const mesEjemplo = `${String(hoy.getMonth() + 1).padStart(2, "0")}/${hoy.getFullYear()}`;
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet([
-    PLANTILLA_HEADERS,
-    ["12345", "Juan", "Pérez", mesEjemplo, 2, 0, "Guardia"],
-  ]);
+  // Solo encabezado: no se incluye fila de ejemplo para que no se pueda
+  // subir por error como si fuera un registro real.
+  const ws = XLSX.utils.aoa_to_sheet([PLANTILLA_HEADERS]);
   ws["!cols"] = PLANTILLA_HEADERS.map((_, i) => ({ wch: i === 6 ? 30 : 18 }));
   XLSX.utils.book_append_sheet(wb, ws, "Horas extra");
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
@@ -145,7 +142,9 @@ function mesLegible(fecha: string): string {
 }
 
 export async function generarExportExcel(filas: FilaExport[], titulo: string): Promise<Buffer> {
-  const filasHoja: (string | number)[][] = [
+  // Todo lo que sea número o fecha va como texto (string), para que Excel no
+  // reformatee legajos, horas o meses al abrir el archivo.
+  const filasHoja: string[][] = [
     [titulo],
     [],
     ["Área", "Legajo", "Nombre", "Apellido", "Mes", "Horas 50%", "Horas 100%", "Total hs", "Motivo", "Cargado por", "Fecha de carga"],
@@ -160,9 +159,9 @@ export async function generarExportExcel(filas: FilaExport[], titulo: string): P
       f.nombre,
       f.apellido,
       mesLegible(f.fecha),
-      f.horas50,
-      f.horas100,
-      f.horas50 + f.horas100,
+      String(f.horas50),
+      String(f.horas100),
+      String(f.horas50 + f.horas100),
       f.motivo ?? "",
       f.cargadoPorUsuario,
       f.createdAt,
@@ -172,7 +171,7 @@ export async function generarExportExcel(filas: FilaExport[], titulo: string): P
   }
 
   filasHoja.push([]);
-  filasHoja.push(["TOTAL", "", "", "", "", total50, total100, total50 + total100]);
+  filasHoja.push(["TOTAL", "", "", "", "", String(total50), String(total100), String(total50 + total100)]);
 
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(filasHoja);

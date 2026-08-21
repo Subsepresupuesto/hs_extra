@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { dbAll, dbGet, dbRun } from "@/lib/db";
-import { chequearLimite, chequearVentanaCarga, getLimites, getVentanaCarga, periodoActual } from "@/lib/hours";
+import { chequearLimite, chequearVentanaCarga, getLimites, getVentanaCarga, periodoActual, yaCargado } from "@/lib/hours";
 
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(["area", "admin"]);
+  const auth = await requireRole(["area", "carga", "admin"]);
   if ("error" in auth) return auth.error;
   const { user } = auth;
 
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const clauses: string[] = [];
   const params: (string | number)[] = [];
 
-  if (user.role === "area") {
+  if (user.role === "area" || user.role === "carga") {
     clauses.push("h.area = ?");
     params.push(user.areaName ?? "");
   } else if (area) {
@@ -110,6 +110,15 @@ export async function POST(req: NextRequest) {
     if (!chequeoVentana.ok) {
       return NextResponse.json({ error: chequeoVentana.motivoPublico }, { status: 403 });
     }
+  }
+
+  if (await yaCargado(legajo, periodo, area)) {
+    return NextResponse.json(
+      {
+        error: `Ya se cargaron horas para el legajo ${legajo} en ${periodo} desde esta área/oficina. Solo se puede cargar una vez por mes (si la persona tiene más de un cargo, cada oficina carga el suyo).`,
+      },
+      { status: 409 }
+    );
   }
 
   const fecha = `${periodo}-01`;

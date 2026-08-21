@@ -16,12 +16,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
-  const motivo = String(body?.motivo ?? "").trim();
-  if (!motivo) {
-    return NextResponse.json({ error: "Indicá el motivo de la anulación." }, { status: 400 });
-  }
+  const motivo = body?.motivo ? String(body.motivo).trim() : null;
 
-  const resultado = await anularRemito(Number(id), user.username, motivo);
+  const resultado = await anularRemito(Number(id), user.username, motivo || null);
   if (!resultado.ok) {
     return NextResponse.json({ error: resultado.error }, { status: 409 });
   }

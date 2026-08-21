@@ -37,9 +37,9 @@ Abrir http://localhost:3000. Queda sembrado con dos usuarios iniciales:
 | `admin`       | `CambiarPassword123` | Administración (carga horas de cualquier área, liberar legajos, topes, usuarios, listado consolidado, remitos) |
 | `area_ejemplo`| `CambiarPassword123` | Área de ejemplo (renombrar o borrar) |
 
-Hay tres roles: **Área** (carga y ve/borra sus propias cargas del día), **Carga**
-(igual pero solo puede cargar — no ve ni un número, pensado para alguien que solo tipea
-datos) y **Administración**.
+Hay tres roles: **Secretaría** (rol `area`: carga y ve/borra sus propias cargas, y
+tiene acceso completo a remitos de su secretaría), **Oficina** (rol `carga`: carga y
+puede ver lo que cargó, pero no puede borrar ni exportar nada) y **Administración**.
 
 **Cambiar estas contraseñas es el primer paso antes de usar el sistema en serio**
 (desde "Mi cuenta" arriba a la derecha, una vez logueado). El usuario `admin` es el
@@ -103,29 +103,43 @@ vez en cuando: `npx wrangler d1 export horas-extra-db --remote --output backup.s
 
 ## Qué incluye
 
-- **Áreas/Carga**: cargan horas extra por mes (no por día — no hace falta esa
+- **Secretarías/Oficinas**: cargan horas extra por mes (no por día — no hace falta esa
   precisión) una por una o en lote subiendo un Excel (plantilla descargable desde la
-  pantalla de carga). Al escribir un legajo que ya tiene cargas anteriores, nombre y
-  apellido se autocompletan. No se pueden cargar meses futuros. La administración puede
-  limitar la carga a una ventana de días del mes (por ejemplo, del 1 al 10); fuera de
-  esa ventana, las áreas no pueden cargar (administración sí, siempre). Ni el tope ni la
-  posibilidad de "liberar" un legajo se les muestra a estos roles — si una carga se
-  rechaza por tope, ven un mensaje genérico sin detalles del mecanismo interno.
-- **Administración**: además de todo lo de las áreas (puede cargar horas eligiendo
-  cualquier área), ve el listado consolidado de todas las áreas con filtros por área/
-  legajo/mes y exporta a Excel; para el PDF/GDE abre una versión imprimible y usa
-  "Guardar como PDF" del navegador; define los topes mensuales (50%, 100% y combinado) y
-  la ventana de carga; libera legajos (temporal para un mes puntual, o permanente) para
-  que puedan superar el tope; y gestiona los usuarios de cada área.
-- Los topes se controlan por legajo y mes calendario; si se supera alguno la carga se
-  rechaza con el detalle de qué tope se excedió, salvo que el legajo esté liberado.
+  pantalla de carga, con dos botones separados: uno para elegir el archivo y otro para
+  cargarlo). Al escribir un legajo que ya tiene cargas anteriores, nombre y apellido se
+  autocompletan. No se pueden cargar meses futuros. Solo se puede cargar una vez por
+  legajo y por mes desde una misma secretaría/oficina (si intenta cargarse de nuevo, se
+  rechaza con aviso); la única excepción es una persona con más de un cargo, a quien
+  cada oficina/secretaría le carga el suyo por separado. La carga en lote es todo-o-nada:
+  si una sola fila del Excel tiene un error, se rechaza el archivo completo, no solo esa
+  fila. La administración puede limitar la carga a una ventana de días del mes (por
+  ejemplo, del 1 al 10); fuera de esa ventana, secretarías y oficinas no pueden cargar
+  (administración sí, siempre). Ni el tope ni la posibilidad de "liberar" un legajo se
+  les muestra a estos roles — si una carga se rechaza por tope, ven un mensaje genérico
+  sin detalles del mecanismo interno. Tanto secretarías como oficinas pueden ver (no
+  exportar) lo que cargaron hasta el momento, con quién lo cargó (si lo cargó otra
+  persona del mismo usuario compartido no se distingue más allá del nombre de usuario).
+  Solo las secretarías (no las oficinas) pueden generar, ver, e imprimir remitos, y
+  únicamente de su propia secretaría — sin acceso a exportar Excel.
+- **Administración**: además de todo lo anterior (puede cargar horas eligiendo cualquier
+  secretaría/oficina, y ahí sí debe aclarar cuál), ve el **listado** de todas las
+  secretarías/oficinas con filtro por secretaría/oficina y mes (no por legajo) y exporta
+  a Excel; para el PDF/GDE abre una versión imprimible y usa "Guardar como PDF" del
+  navegador; define los topes mensuales (50%, 100% y combinado) y la ventana de carga;
+  libera legajos (temporal para un mes puntual, o permanente) para que puedan superar el
+  tope; y gestiona los usuarios de cada secretaría/oficina.
+- Los topes se controlan por legajo y mes calendario, sumando todas las cargas de ese
+  legajo en el mes sin importar desde qué secretaría/oficina se cargaron; si se supera
+  alguno la carga se rechaza con el detalle de qué tope se excedió, salvo que el legajo
+  esté liberado.
 - **Remitos**: para que las mismas horas nunca se manden dos veces por GDE. Desde
-  "Remitos", administración junta las horas de un período/área en un documento con un
-  código único. Mientras está en **borrador** se puede imprimir y anular libremente. Al
-  **confirmarlo**, esas horas quedan bloqueadas para siempre (no se pueden borrar ni
-  entrar en otro remito). Si hace falta corregir un error, se puede **anular** un
-  remito (borrador o confirmado, con motivo obligatorio) y sus horas vuelven a estar
-  disponibles para un remito nuevo. Queda todo el historial accesible desde ese menú.
+  "Remitos", administración (todas las áreas) o una secretaría (solo la propia) junta
+  las horas de un período en un documento con un código único. **Queda confirmado en el
+  momento en que se genera** (que es cuando se manda a imprimir): no hay un paso de
+  confirmación aparte. Esas horas quedan bloqueadas para siempre (no se pueden borrar ni
+  entrar en otro remito). Si hace falta corregir un error, se puede **anular** el remito
+  (no hace falta indicar un motivo) y sus horas vuelven a estar disponibles para un
+  remito nuevo. Queda todo el historial accesible desde ese menú.
 
 ## Cambiar el nombre de la URL
 
