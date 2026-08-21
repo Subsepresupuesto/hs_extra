@@ -33,6 +33,7 @@ export default async function ImprimirRemitoPage({ params }: { params: Promise<{
         .print-page .estado.borrador { color: #b45309; }
         .print-page .estado.confirmado { color: #047857; }
         .print-page .estado.anulado { color: #b91c1c; }
+        .print-page .aviso-confirmado { font-size: 13px; font-weight: 600; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 14px; margin: 0 0 20px; }
         .print-page table { width: 100%; border-collapse: collapse; font-size: 12px; }
         .print-page th { text-align: left; border-bottom: 1.5px solid #0f172a; padding: 4px 8px 4px 0; }
         .print-page td { border-bottom: 1px solid #e2e8f0; padding: 4px 8px 4px 0; }
@@ -44,13 +45,21 @@ export default async function ImprimirRemitoPage({ params }: { params: Promise<{
         }
       `}</style>
 
+      {remito.estado === "confirmado" && (
+        <p className="no-print aviso-confirmado">
+          ⚠ Este remito está <b>CONFIRMADO</b>: las horas que incluye ya no se pueden volver a cargar
+          ni incluir en otro remito, y <b>este documento no se puede anular</b> salvo por
+          administración, como excepción.
+        </p>
+      )}
+
       <div className="no-print">
         <ImprimirButton />
       </div>
 
       <h1>Remito {remito.codigo}</h1>
       <p className="sub">
-        Período: {remito.desde} a {remito.hasta}
+        Período: {remito.desde === remito.hasta ? remito.desde : `${remito.desde} a ${remito.hasta}`}
         {remito.area ? ` · Área: ${remito.area}` : " · Todas las áreas"}
       </p>
       <p className="sub">

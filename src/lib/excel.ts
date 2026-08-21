@@ -10,11 +10,25 @@ export const PLANTILLA_HEADERS = [
   "Motivo",
 ];
 
+// Legajo de la fila de ejemplo de la plantilla: se reconoce y se descarta
+// automáticamente al leer el archivo, así puede quedar en la plantilla como
+// guía sin que haga falta borrarla ni que se cargue por error.
+export const EXAMPLE_LEGAJO = "12345";
+
 export async function generarPlantilla(): Promise<Buffer> {
   const wb = XLSX.utils.book_new();
-  // Solo encabezado: no se incluye fila de ejemplo para que no se pueda
-  // subir por error como si fuera un registro real.
-  const ws = XLSX.utils.aoa_to_sheet([PLANTILLA_HEADERS]);
+  const hoy = new Date();
+  const mesActual = `${String(hoy.getMonth() + 1).padStart(2, "0")}/${hoy.getFullYear()}`;
+  const filaEjemplo = [
+    EXAMPLE_LEGAJO,
+    "Juan",
+    "Pérez",
+    mesActual,
+    "2",
+    "0",
+    "Ejemplo — esta fila se ignora automáticamente al cargar el archivo, no hace falta borrarla",
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([PLANTILLA_HEADERS, filaEjemplo]);
   ws["!cols"] = PLANTILLA_HEADERS.map((_, i) => ({ wch: i === 6 ? 30 : 18 }));
   XLSX.utils.book_append_sheet(wb, ws, "Horas extra");
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
@@ -91,6 +105,7 @@ export async function parsearPlantilla(buffer: Buffer): Promise<FilaCarga[]> {
     const motivo = celdaTexto(row[6]) || null;
 
     if (!legajo && !nombre && !apellido && !mesRaw) return; // fila vacía
+    if (legajo === EXAMPLE_LEGAJO) return; // fila de ejemplo de la plantilla: no se cuenta
 
     const fecha = celdaMes(mesRaw);
     const horas50 = celdaNumero(horas50Raw);

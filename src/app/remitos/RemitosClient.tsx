@@ -42,8 +42,7 @@ export default function RemitosClient({
   const [cargando, setCargando] = useState(true);
 
   const [area, setArea] = useState("");
-  const [desde, setDesde] = useState("");
-  const [hasta, setHasta] = useState("");
+  const [mes, setMes] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,12 +76,16 @@ export default function RemitosClient({
       setError("Tu usuario no tiene un área asignada.");
       return;
     }
+    const avisoAnular = esAdmin
+      ? "Al generarlo, el remito queda confirmado en el acto: las horas incluidas quedan bloqueadas para siempre. Después se puede anular solo como excepción, desde administración."
+      : "Al generarlo, el remito queda confirmado en el acto: las horas incluidas quedan bloqueadas para siempre y vos ya no vas a poder anularlo — solo administración puede hacerlo, como excepción.";
+    if (!confirm(`${avisoAnular} ¿Confirmás que querés generarlo?`)) return;
     setEnviando(true);
     try {
       const res = await fetch("/api/remitos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ area: esAdmin ? area || null : areaFija, desde, hasta }),
+        body: JSON.stringify({ area: esAdmin ? area || null : areaFija, periodo: mes }),
       });
       const data = (await res.json()) as { error?: string; remito?: { id: number } };
       if (!res.ok) {
@@ -121,10 +124,14 @@ export default function RemitosClient({
       <section className="bg-white border border-slate-200 rounded-xl p-6">
         <h2 className="text-base font-semibold text-slate-900 mb-1">Generar remito</h2>
         <p className="text-sm text-slate-500 mb-4">
-          Junta las horas del período elegido (que todavía no estén en otro remito) en un documento
-          único para mandar por GDE. <b>Al generarlo queda confirmado en el momento</b> y esas horas
-          quedan bloqueadas para siempre — no se pueden volver a incluir en otro remito. Si hay un
-          error, se puede anular y las horas vuelven a estar disponibles.
+          Junta las horas del mes elegido (que todavía no estén en otro remito) en un documento único
+          para mandar por GDE. <b>Al generarlo queda confirmado en el momento</b> y esas horas quedan
+          bloqueadas para siempre — no se pueden volver a incluir en otro remito.
+        </p>
+        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
+          ⚠ Un remito confirmado <b>no se puede anular</b>{esAdmin ? "" : " desde tu usuario"} — es
+          un documento firme. {esAdmin ? "Solo administración puede anularlo" : "Solo administración puede hacerlo"},
+          y únicamente como excepción.
         </p>
         <form onSubmit={handleGenerar} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {esAdmin ? (
@@ -154,21 +161,11 @@ export default function RemitosClient({
             </div>
           )}
           <div>
-            <label className="text-sm font-medium text-slate-700">Desde</label>
+            <label className="text-sm font-medium text-slate-700">Mes</label>
             <input
               type="month"
-              value={desde}
-              onChange={(e) => setDesde(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-              required
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-slate-700">Hasta</label>
-            <input
-              type="month"
-              value={hasta}
-              onChange={(e) => setHasta(e.target.value)}
+              value={mes}
+              onChange={(e) => setMes(e.target.value)}
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
               required
             />
@@ -216,9 +213,7 @@ export default function RemitosClient({
                   <tr key={r.id} className="border-b border-slate-100">
                     <td className="py-2 pr-4 font-medium">{r.codigo}</td>
                     {esAdmin && <td className="py-2 pr-4">{r.area ?? "Todas"}</td>}
-                    <td className="py-2 pr-4">
-                      {r.desde} a {r.hasta}
-                    </td>
+                    <td className="py-2 pr-4">{r.desde === r.hasta ? r.desde : `${r.desde} a ${r.hasta}`}</td>
                     <td className="py-2 pr-4">
                       <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full border ${estadoPill[r.estado]}`}>
                         {estadoLabel[r.estado]}
@@ -236,7 +231,7 @@ export default function RemitosClient({
                       >
                         Ver / imprimir
                       </a>
-                      {r.estado === "confirmado" && (
+                      {esAdmin && r.estado === "confirmado" && (
                         <button onClick={() => handleAnular(r.id)} className="text-xs text-red-700 hover:underline">
                           Anular
                         </button>
