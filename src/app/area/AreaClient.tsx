@@ -23,18 +23,20 @@ type Disponible = {
   liberado: boolean;
 };
 
-function hoyIso() {
-  return new Date().toISOString().slice(0, 10);
+function mesActualIso() {
+  return new Date().toISOString().slice(0, 7);
 }
 
 export default function AreaClient({
-  areaFija,
+  rol,
   areasDisponibles,
 }: {
-  areaFija: string | null;
+  rol: "area" | "carga" | "admin";
   areasDisponibles: string[];
 }) {
-  const esAdmin = areaFija === null;
+  const esAdmin = rol === "admin";
+  const esCarga = rol === "carga";
+  const mesActual = mesActualIso();
 
   const [registros, setRegistros] = useState<Registro[]>([]);
   const [cargandoLista, setCargandoLista] = useState(true);
@@ -43,7 +45,7 @@ export default function AreaClient({
   const [legajo, setLegajo] = useState("");
   const [nombre, setNombre] = useState("");
   const [apellido, setApellido] = useState("");
-  const [fecha, setFecha] = useState(hoyIso());
+  const [periodo, setPeriodo] = useState(mesActual);
   const [horas50, setHoras50] = useState("");
   const [horas100, setHoras100] = useState("");
   const [motivo, setMotivo] = useState("");
@@ -57,6 +59,7 @@ export default function AreaClient({
   const [resultadoBulk, setResultadoBulk] = useState<{ insertados: number; rechazados: { fila: number; motivo: string }[] } | null>(null);
 
   function recargar() {
+    if (esCarga) return;
     setCargandoLista(true);
     fetch("/api/horas")
       .then((r) => r.json() as Promise<{ registros: Registro[] }>)
@@ -68,6 +71,7 @@ export default function AreaClient({
   }
 
   useEffect(() => {
+    if (esCarga) return;
     const controller = new AbortController();
     fetch("/api/horas", { signal: controller.signal })
       .then((r) => r.json() as Promise<{ registros: Registro[] }>)
@@ -77,6 +81,7 @@ export default function AreaClient({
       })
       .catch(() => {});
     return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const legajoConsulta = legajo.trim();
@@ -102,11 +107,12 @@ export default function AreaClient({
     };
   }, [legajoConsulta]);
 
+  // Solo admin ve el detalle de topes/liberación.
   useEffect(() => {
-    if (!legajoConsulta || !fecha) return;
+    if (!esAdmin || !legajoConsulta || !periodo) return;
     const controller = new AbortController();
     const t = setTimeout(() => {
-      fetch(`/api/horas/disponible?legajo=${encodeURIComponent(legajoConsulta)}&fecha=${fecha}`, {
+      fetch(`/api/horas/disponible?legajo=${encodeURIComponent(legajoConsulta)}&periodo=${periodo}`, {
         signal: controller.signal,
       })
         .then((r) => (r.ok ? (r.json() as Promise<Disponible>) : null))
@@ -117,7 +123,7 @@ export default function AreaClient({
       clearTimeout(t);
       controller.abort();
     };
-  }, [legajoConsulta, fecha]);
+  }, [esAdmin, legajoConsulta, periodo]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -137,7 +143,7 @@ export default function AreaClient({
           legajo: legajo.trim(),
           nombre: nombre.trim(),
           apellido: apellido.trim(),
-          fecha,
+          periodo,
           horas50: horas50 === "" ? 0 : Number(horas50),
           horas100: horas100 === "" ? 0 : Number(horas100),
           motivo: motivo.trim() || null,
@@ -204,7 +210,7 @@ export default function AreaClient({
     }
   }
 
-  const hoy = hoyIso();
+  const hoy = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="space-y-8">
@@ -257,11 +263,12 @@ export default function AreaClient({
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-700">Fecha</label>
+            <label className="text-sm font-medium text-slate-700">Mes</label>
             <input
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
+              type="month"
+              value={periodo}
+              max={mesActual}
+              onChange={(e) => setPeriodo(e.target.value)}
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
               required
             />
@@ -298,7 +305,7 @@ export default function AreaClient({
             />
           </div>
 
-          {disponible && legajoConsulta && (
+          {esAdmin && disponible && legajoConsulta && (
             <div className="sm:col-span-2 lg:col-span-4 text-xs rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">
               Período {disponible.periodo}: acumulado {disponible.totales.h50} hs al 50% (tope{" "}
               {disponible.limites.limite50 || "sin tope"}) y {disponible.totales.h100} hs al 100% (tope{" "}
@@ -391,58 +398,60 @@ export default function AreaClient({
         )}
       </section>
 
-      <section className="bg-white border border-slate-200 rounded-xl p-6">
-        <h2 className="text-base font-semibold text-slate-900 mb-4">
-          {esAdmin ? "Cargas recientes" : "Cargas de tu área"}
-        </h2>
-        {cargandoLista ? (
-          <p className="text-sm text-slate-500">Cargando...</p>
-        ) : registros.length === 0 ? (
-          <p className="text-sm text-slate-500">Todavía no hay cargas.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-500 border-b border-slate-200">
-                  {esAdmin && <th className="py-2 pr-4">Área</th>}
-                  <th className="py-2 pr-4">Legajo</th>
-                  <th className="py-2 pr-4">Nombre</th>
-                  <th className="py-2 pr-4">Fecha</th>
-                  <th className="py-2 pr-4">50%</th>
-                  <th className="py-2 pr-4">100%</th>
-                  <th className="py-2 pr-4">Motivo</th>
-                  <th className="py-2 pr-4"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {registros.map((r) => (
-                  <tr key={r.id} className="border-b border-slate-100">
-                    {esAdmin && <td className="py-2 pr-4">{r.area}</td>}
-                    <td className="py-2 pr-4">{r.legajo}</td>
-                    <td className="py-2 pr-4">
-                      {r.nombre} {r.apellido}
-                    </td>
-                    <td className="py-2 pr-4">{r.fecha}</td>
-                    <td className="py-2 pr-4">{r.horas50}</td>
-                    <td className="py-2 pr-4">{r.horas100}</td>
-                    <td className="py-2 pr-4 text-slate-500">{r.motivo}</td>
-                    <td className="py-2 pr-4 text-right">
-                      {(esAdmin || r.createdAt.slice(0, 10) === hoy) && (
-                        <button
-                          onClick={() => handleEliminar(r.id)}
-                          className="text-red-700 hover:underline text-xs"
-                        >
-                          Eliminar
-                        </button>
-                      )}
-                    </td>
+      {!esCarga && (
+        <section className="bg-white border border-slate-200 rounded-xl p-6">
+          <h2 className="text-base font-semibold text-slate-900 mb-4">
+            {esAdmin ? "Cargas recientes" : "Cargas de tu área"}
+          </h2>
+          {cargandoLista ? (
+            <p className="text-sm text-slate-500">Cargando...</p>
+          ) : registros.length === 0 ? (
+            <p className="text-sm text-slate-500">Todavía no hay cargas.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-slate-500 border-b border-slate-200">
+                    {esAdmin && <th className="py-2 pr-4">Área</th>}
+                    <th className="py-2 pr-4">Legajo</th>
+                    <th className="py-2 pr-4">Nombre</th>
+                    <th className="py-2 pr-4">Mes</th>
+                    <th className="py-2 pr-4">50%</th>
+                    <th className="py-2 pr-4">100%</th>
+                    <th className="py-2 pr-4">Motivo</th>
+                    <th className="py-2 pr-4"></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                </thead>
+                <tbody>
+                  {registros.map((r) => (
+                    <tr key={r.id} className="border-b border-slate-100">
+                      {esAdmin && <td className="py-2 pr-4">{r.area}</td>}
+                      <td className="py-2 pr-4">{r.legajo}</td>
+                      <td className="py-2 pr-4">
+                        {r.nombre} {r.apellido}
+                      </td>
+                      <td className="py-2 pr-4">{r.fecha.slice(0, 7)}</td>
+                      <td className="py-2 pr-4">{r.horas50}</td>
+                      <td className="py-2 pr-4">{r.horas100}</td>
+                      <td className="py-2 pr-4 text-slate-500">{r.motivo}</td>
+                      <td className="py-2 pr-4 text-right">
+                        {(esAdmin || r.createdAt.slice(0, 10) === hoy) && (
+                          <button
+                            onClick={() => handleEliminar(r.id)}
+                            className="text-red-700 hover:underline text-xs"
+                          >
+                            Eliminar
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }

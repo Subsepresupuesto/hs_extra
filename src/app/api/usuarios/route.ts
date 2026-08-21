@@ -24,14 +24,14 @@ export async function POST(req: NextRequest) {
   const role = String(body?.role ?? "");
   const areaName = body?.areaName ? String(body.areaName).trim() : null;
 
-  if (!username || !password || !["area", "admin"].includes(role)) {
+  if (!username || !password || !["area", "carga", "admin"].includes(role)) {
     return NextResponse.json({ error: "Datos incompletos o rol inválido." }, { status: 400 });
   }
   if (password.length < 8) {
     return NextResponse.json({ error: "La contraseña debe tener al menos 8 caracteres." }, { status: 400 });
   }
-  if (role === "area" && !areaName) {
-    return NextResponse.json({ error: "Los usuarios de área necesitan un nombre de área." }, { status: 400 });
+  if ((role === "area" || role === "carga") && !areaName) {
+    return NextResponse.json({ error: "Los usuarios de área/carga necesitan un nombre de área." }, { status: 400 });
   }
 
   const existente = await dbGet("SELECT id FROM users WHERE username = ?", username);
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     username,
     hashPassword(password),
     role,
-    role === "area" ? areaName : null
+    role === "area" || role === "carga" ? areaName : null
   );
 
   return NextResponse.json({ ok: true });

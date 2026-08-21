@@ -24,9 +24,57 @@ export async function setLimites(l: Limites): Promise<void> {
   await dbRun(upsert, "limite_combinado", String(l.limiteCombinado));
 }
 
+export type VentanaCarga = {
+  diaInicio: number | null;
+  diaFin: number | null;
+};
+
+export async function getVentanaCarga(): Promise<VentanaCarga> {
+  const rows = await dbAll<{ clave: string; valor: string }>(
+    "SELECT clave, valor FROM config WHERE clave IN ('ventana_dia_inicio', 'ventana_dia_fin')"
+  );
+  const map = Object.fromEntries(rows.map((r) => [r.clave, r.valor]));
+  const diaInicio = map.ventana_dia_inicio ? Number(map.ventana_dia_inicio) : null;
+  const diaFin = map.ventana_dia_fin ? Number(map.ventana_dia_fin) : null;
+  return {
+    diaInicio: diaInicio && diaInicio >= 1 && diaInicio <= 31 ? diaInicio : null,
+    diaFin: diaFin && diaFin >= 1 && diaFin <= 31 ? diaFin : null,
+  };
+}
+
+export async function setVentanaCarga(v: VentanaCarga): Promise<void> {
+  const upsert =
+    "INSERT INTO config (clave, valor) VALUES (?, ?) ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor";
+  await dbRun(upsert, "ventana_dia_inicio", v.diaInicio ? String(v.diaInicio) : "");
+  await dbRun(upsert, "ventana_dia_fin", v.diaFin ? String(v.diaFin) : "");
+}
+
+export function chequearVentanaCarga(ventana: VentanaCarga, ahora: Date = new Date()): CheckResult {
+  const { diaInicio, diaFin } = ventana;
+  if (!diaInicio || !diaFin) return { ok: true };
+
+  const diaHoy = ahora.getDate();
+  const dentro =
+    diaInicio <= diaFin
+      ? diaHoy >= diaInicio && diaHoy <= diaFin
+      : diaHoy >= diaInicio || diaHoy <= diaFin; // ventana que cruza fin de mes
+
+  if (dentro) return { ok: true };
+
+  return {
+    ok: false,
+    motivoPublico: `La carga de horas extra solo está habilitada entre el día ${diaInicio} y el día ${diaFin} de cada mes.`,
+    motivoAdmin: `Fuera de la ventana de carga (día ${diaInicio} a ${diaFin} del mes). Se puede editar desde "Topes".`,
+  };
+}
+
 export function periodoDeFecha(fecha: string): string {
   // fecha: YYYY-MM-DD -> periodo: YYYY-MM
   return fecha.slice(0, 7);
+}
+
+export function periodoActual(): string {
+  return new Date().toISOString().slice(0, 7);
 }
 
 export async function totalesLegajoPeriodo(legajo: string, periodo: string) {
@@ -50,7 +98,7 @@ export async function legajoLiberado(legajo: string, periodo: string): Promise<b
   return !!row;
 }
 
-export type CheckResult = { ok: true } | { ok: false; motivo: string };
+export type CheckResult = { ok: true } | { ok: false; motivoPublico: string; motivoAdmin: string };
 
 export async function chequearLimite(params: {
   legajo: string;
@@ -84,9 +132,12 @@ export async function chequearLimite(params: {
   if (excesos.length > 0) {
     return {
       ok: false,
-      motivo: `El legajo ${legajo} supera el tope mensual de ${periodo} en: ${excesos.join(
+      motivoPublico: `El legajo ${legajo} supera el tope mensual de ${periodo} en: ${excesos.join(
         "; "
-      )}. Pedile a la administración que libere el legajo si corresponde.`,
+      )}. Contactá a la administración.`,
+      motivoAdmin: `El legajo ${legajo} supera el tope mensual de ${periodo} en: ${excesos.join(
+        "; "
+      )}. Podés liberar el legajo desde "Liberar legajos" si corresponde.`,
     };
   }
 

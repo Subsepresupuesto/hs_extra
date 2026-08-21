@@ -1,25 +1,26 @@
-import ExcelJS from "exceljs";
+import * as XLSX from "xlsx";
 
 export const PLANTILLA_HEADERS = [
   "Legajo",
   "Nombre",
   "Apellido",
-  "Fecha (DD/MM/AAAA)",
+  "Mes (MM/AAAA)",
   "Horas 50%",
   "Horas 100%",
   "Motivo",
 ];
 
 export async function generarPlantilla(): Promise<Buffer> {
-  const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Horas extra");
-  ws.addRow(PLANTILLA_HEADERS);
-  ws.getRow(1).font = { bold: true };
-  ws.addRow(["12345", "Juan", "Pérez", "01/08/2026", 2, 0, "Guardia"]);
-  ws.columns.forEach((col, i) => {
-    col.width = i === 6 ? 30 : 18;
-  });
-  const buf = await wb.xlsx.writeBuffer();
+  const hoy = new Date();
+  const mesEjemplo = `${String(hoy.getMonth() + 1).padStart(2, "0")}/${hoy.getFullYear()}`;
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([
+    PLANTILLA_HEADERS,
+    ["12345", "Juan", "Pérez", mesEjemplo, 2, 0, "Guardia"],
+  ]);
+  ws["!cols"] = PLANTILLA_HEADERS.map((_, i) => ({ wch: i === 6 ? 30 : 18 }));
+  XLSX.utils.book_append_sheet(wb, ws, "Horas extra");
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
   return Buffer.from(buf);
 }
 
@@ -28,77 +29,84 @@ export type FilaCarga = {
   legajo: string;
   nombre: string;
   apellido: string;
-  fecha: string; // YYYY-MM-DD
+  fecha: string; // YYYY-MM-01 (primer día del mes cargado)
   horas50: number;
   horas100: number;
   motivo: string | null;
   errorFormato?: string;
 };
 
-function celdaTexto(v: ExcelJS.CellValue): string {
+function celdaTexto(v: unknown): string {
   if (v === null || v === undefined) return "";
-  if (typeof v === "object" && "text" in (v as { text?: string })) {
-    return String((v as { text?: string }).text ?? "").trim();
-  }
+  if (v instanceof Date) return v.toISOString();
   return String(v).trim();
 }
 
-function celdaFecha(v: ExcelJS.CellValue): string | null {
+function celdaMes(v: unknown): string | null {
   if (v === null || v === undefined || v === "") return null;
+
   if (v instanceof Date) {
     const y = v.getFullYear();
     const m = String(v.getMonth() + 1).padStart(2, "0");
-    const d = String(v.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
+    return `${y}-${m}-01`;
   }
+
   const texto = celdaTexto(v);
-  const match = texto.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-  if (match) {
-    const [, d, m, y] = match;
-    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  const matchMmAaaa = texto.match(/^(\d{1,2})[/-](\d{4})$/);
+  if (matchMmAaaa) {
+    const [, m, y] = matchMmAaaa;
+    return `${y}-${m.padStart(2, "0")}-01`;
   }
-  const isoMatch = texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (isoMatch) return texto;
+  const matchAaaaMm = texto.match(/^(\d{4})-(\d{1,2})$/);
+  if (matchAaaaMm) {
+    const [, y, m] = matchAaaaMm;
+    return `${y}-${m.padStart(2, "0")}-01`;
+  }
   return null;
 }
 
-function celdaNumero(v: ExcelJS.CellValue): number {
+function celdaNumero(v: unknown): number {
   if (v === null || v === undefined || v === "") return 0;
   const n = typeof v === "number" ? v : Number(celdaTexto(v).replace(",", "."));
   return Number.isFinite(n) ? n : NaN;
 }
 
 export async function parsearPlantilla(buffer: Buffer): Promise<FilaCarga[]> {
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(buffer as unknown as ArrayBuffer);
-  const ws = wb.worksheets[0];
-  if (!ws) return [];
+  const wb = XLSX.read(buffer, { type: "buffer", cellDates: true });
+  const nombreHoja = wb.SheetNames[0];
+  if (!nombreHoja) return [];
+  const ws = wb.Sheets[nombreHoja];
+  const filasCrudas = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, blankrows: false });
 
+  const periodoActualStr = new Date().toISOString().slice(0, 7);
   const filas: FilaCarga[] = [];
-  ws.eachRow((row, rowNumber) => {
+
+  filasCrudas.forEach((row, idx) => {
+    const rowNumber = idx + 1;
     if (rowNumber === 1) return; // header
-    const legajo = celdaTexto(row.getCell(1).value);
-    const nombre = celdaTexto(row.getCell(2).value);
-    const apellido = celdaTexto(row.getCell(3).value);
-    const fechaRaw = row.getCell(4).value;
-    const horas50Raw = row.getCell(5).value;
-    const horas100Raw = row.getCell(6).value;
-    const motivo = celdaTexto(row.getCell(7).value) || null;
 
-    if (!legajo && !nombre && !apellido && !fechaRaw) return; // fila vacía
+    const legajo = celdaTexto(row[0]);
+    const nombre = celdaTexto(row[1]);
+    const apellido = celdaTexto(row[2]);
+    const mesRaw = row[3];
+    const horas50Raw = row[4];
+    const horas100Raw = row[5];
+    const motivo = celdaTexto(row[6]) || null;
 
-    const fecha = celdaFecha(fechaRaw);
+    if (!legajo && !nombre && !apellido && !mesRaw) return; // fila vacía
+
+    const fecha = celdaMes(mesRaw);
     const horas50 = celdaNumero(horas50Raw);
     const horas100 = celdaNumero(horas100Raw);
 
     let errorFormato: string | undefined;
     if (!legajo) errorFormato = "Falta el legajo.";
     else if (!nombre || !apellido) errorFormato = "Falta nombre o apellido.";
-    else if (!fecha) errorFormato = "Fecha inválida (usar DD/MM/AAAA).";
+    else if (!fecha) errorFormato = "Mes inválido (usar MM/AAAA).";
+    else if (fecha.slice(0, 7) > periodoActualStr) errorFormato = "No se pueden cargar meses futuros.";
     else if (Number.isNaN(horas50) || Number.isNaN(horas100))
       errorFormato = "Horas 50%/100% deben ser numéricas.";
-    else if (horas50 < 0 || horas100 < 0)
-      errorFormato = "Las horas no pueden ser negativas.";
+    else if (horas50 < 0 || horas100 < 0) errorFormato = "Las horas no pueden ser negativas.";
     else if (horas50 === 0 && horas100 === 0)
       errorFormato = "Debe cargar al menos horas al 50% o al 100%.";
 
@@ -131,41 +139,27 @@ export type FilaExport = {
   createdAt: string;
 };
 
-export async function generarExportExcel(
-  filas: FilaExport[],
-  titulo: string
-): Promise<Buffer> {
-  const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Consolidado");
+function mesLegible(fecha: string): string {
+  const [y, m] = fecha.split("-");
+  return `${m}/${y}`;
+}
 
-  ws.addRow([titulo]);
-  ws.getRow(1).font = { bold: true, size: 14 };
-  ws.addRow([]);
-
-  const headerRow = ws.addRow([
-    "Área",
-    "Legajo",
-    "Nombre",
-    "Apellido",
-    "Fecha",
-    "Horas 50%",
-    "Horas 100%",
-    "Total hs",
-    "Motivo",
-    "Cargado por",
-    "Fecha de carga",
-  ]);
-  headerRow.font = { bold: true };
+export async function generarExportExcel(filas: FilaExport[], titulo: string): Promise<Buffer> {
+  const filasHoja: (string | number)[][] = [
+    [titulo],
+    [],
+    ["Área", "Legajo", "Nombre", "Apellido", "Mes", "Horas 50%", "Horas 100%", "Total hs", "Motivo", "Cargado por", "Fecha de carga"],
+  ];
 
   let total50 = 0;
   let total100 = 0;
   for (const f of filas) {
-    ws.addRow([
+    filasHoja.push([
       f.area,
       f.legajo,
       f.nombre,
       f.apellido,
-      f.fecha,
+      mesLegible(f.fecha),
       f.horas50,
       f.horas100,
       f.horas50 + f.horas100,
@@ -177,23 +171,13 @@ export async function generarExportExcel(
     total100 += f.horas100;
   }
 
-  ws.addRow([]);
-  const totalRow = ws.addRow([
-    "TOTAL",
-    "",
-    "",
-    "",
-    "",
-    total50,
-    total100,
-    total50 + total100,
-  ]);
-  totalRow.font = { bold: true };
+  filasHoja.push([]);
+  filasHoja.push(["TOTAL", "", "", "", "", total50, total100, total50 + total100]);
 
-  ws.columns.forEach((col, i) => {
-    col.width = i === 8 ? 30 : i <= 3 ? 14 : 12;
-  });
-
-  const buf = await wb.xlsx.writeBuffer();
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(filasHoja);
+  ws["!cols"] = [14, 12, 14, 14, 10, 12, 12, 12, 30, 14, 20].map((wch) => ({ wch }));
+  XLSX.utils.book_append_sheet(wb, ws, "Consolidado");
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
   return Buffer.from(buf);
 }

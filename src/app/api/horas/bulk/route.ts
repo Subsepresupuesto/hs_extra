@@ -2,17 +2,32 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { dbGet, dbRun } from "@/lib/db";
 import { parsearPlantilla } from "@/lib/excel";
-import { getLimites, periodoDeFecha, totalesLegajoPeriodo, legajoLiberado } from "@/lib/hours";
+import {
+  chequearVentanaCarga,
+  getLimites,
+  getVentanaCarga,
+  periodoDeFecha,
+  totalesLegajoPeriodo,
+  legajoLiberado,
+} from "@/lib/hours";
 
 export async function POST(req: NextRequest) {
-  const auth = await requireRole(["area", "admin"]);
+  const auth = await requireRole(["area", "carga", "admin"]);
   if ("error" in auth) return auth.error;
   const { user } = auth;
+
+  if (user.role !== "admin") {
+    const ventana = await getVentanaCarga();
+    const chequeoVentana = chequearVentanaCarga(ventana);
+    if (!chequeoVentana.ok) {
+      return NextResponse.json({ error: chequeoVentana.motivoPublico }, { status: 403 });
+    }
+  }
 
   const formData = await req.formData().catch(() => null);
 
   let area: string;
-  if (user.role === "area") {
+  if (user.role === "area" || user.role === "carga") {
     if (!user.areaName) {
       return NextResponse.json(
         { error: "Tu usuario no tiene un área asignada. Contactá a la administración." },
@@ -23,7 +38,7 @@ export async function POST(req: NextRequest) {
   } else {
     const areaSolicitada = String(formData?.get("area") ?? "").trim();
     const existe = await dbGet(
-      "SELECT 1 FROM users WHERE role = 'area' AND area_name = ? AND activo = 1",
+      "SELECT 1 FROM users WHERE role IN ('area','carga') AND area_name = ? AND activo = 1",
       areaSolicitada
     );
     if (!areaSolicitada || !existe) {

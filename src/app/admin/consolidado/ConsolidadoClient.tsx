@@ -14,6 +14,7 @@ type Registro = {
   motivo: string | null;
   cargadoPorUsuario: string;
   createdAt: string;
+  remitoCodigo: string | null;
 };
 
 export default function ConsolidadoClient() {
@@ -93,25 +94,25 @@ export default function ConsolidadoClient() {
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-700">Desde</label>
+            <label className="text-sm font-medium text-slate-700">Desde (mes)</label>
             <input
-              type="date"
+              type="month"
               value={desde}
               onChange={(e) => setDesde(e.target.value)}
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-700">Hasta</label>
+            <label className="text-sm font-medium text-slate-700">Hasta (mes)</label>
             <input
-              type="date"
+              type="month"
               value={hasta}
               onChange={(e) => setHasta(e.target.value)}
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
         </div>
-        <div className="flex flex-wrap gap-3 mt-4">
+        <div className="flex flex-wrap items-center gap-3 mt-4">
           <a
             href={`/api/horas/export/excel?${queryString()}`}
             className="rounded-md bg-red-700 text-white text-sm font-medium px-4 py-2 hover:bg-red-800"
@@ -124,8 +125,15 @@ export default function ConsolidadoClient() {
             rel="noopener noreferrer"
             className="rounded-md bg-slate-100 text-slate-900 text-sm font-medium px-4 py-2 hover:bg-slate-200"
           >
-            Imprimir / PDF (GDE)
+            Vista previa / imprimir
           </a>
+          <p className="text-xs text-slate-500">
+            Para mandar por GDE sin repetir horas, usá{" "}
+            <a href="/admin/remitos" className="text-red-700 underline font-medium">
+              Remitos
+            </a>{" "}
+            en vez de esta vista previa.
+          </p>
         </div>
       </section>
 
@@ -151,10 +159,11 @@ export default function ConsolidadoClient() {
                   <th className="py-2 pr-4">Área</th>
                   <th className="py-2 pr-4">Legajo</th>
                   <th className="py-2 pr-4">Nombre</th>
-                  <th className="py-2 pr-4">Fecha</th>
+                  <th className="py-2 pr-4">Mes</th>
                   <th className="py-2 pr-4">50%</th>
                   <th className="py-2 pr-4">100%</th>
                   <th className="py-2 pr-4">Motivo</th>
+                  <th className="py-2 pr-4">Remito</th>
                 </tr>
               </thead>
               <tbody>
@@ -165,10 +174,11 @@ export default function ConsolidadoClient() {
                     <td className="py-2 pr-4">
                       {r.nombre} {r.apellido}
                     </td>
-                    <td className="py-2 pr-4">{r.fecha}</td>
+                    <td className="py-2 pr-4">{r.fecha.slice(0, 7)}</td>
                     <td className="py-2 pr-4">{r.horas50}</td>
                     <td className="py-2 pr-4">{r.horas100}</td>
                     <td className="py-2 pr-4 text-slate-500">{r.motivo}</td>
+                    <td className="py-2 pr-4 text-slate-500">{r.remitoCodigo ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>

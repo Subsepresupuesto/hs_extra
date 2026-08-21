@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth";
 import { dbGet } from "@/lib/db";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ legajo: string }> }) {
-  const auth = await requireRole(["area", "admin"]);
+  const auth = await requireRole(["area", "carga", "admin"]);
   if ("error" in auth) return auth.error;
   const { legajo } = await params;
 

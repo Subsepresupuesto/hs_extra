@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth";
 import { generarPlantilla } from "@/lib/excel";
 
 export async function GET() {
-  const auth = await requireRole(["area", "admin"]);
+  const auth = await requireRole(["area", "carga", "admin"]);
   if ("error" in auth) return auth.error;
 
   const buffer = await generarPlantilla();

@@ -34,8 +34,12 @@ Abrir http://localhost:3000. Queda sembrado con dos usuarios iniciales:
 
 | Usuario       | Contraseña           | Rol           |
 |---------------|-----------------------|---------------|
-| `admin`       | `CambiarPassword123` | Administración (carga horas de cualquier área, liberar legajos, topes, usuarios, listado consolidado) |
+| `admin`       | `CambiarPassword123` | Administración (carga horas de cualquier área, liberar legajos, topes, usuarios, listado consolidado, remitos) |
 | `area_ejemplo`| `CambiarPassword123` | Área de ejemplo (renombrar o borrar) |
+
+Hay tres roles: **Área** (carga y ve/borra sus propias cargas del día), **Carga**
+(igual pero solo puede cargar — no ve ni un número, pensado para alguien que solo tipea
+datos) y **Administración**.
 
 **Cambiar estas contraseñas es el primer paso antes de usar el sistema en serio**
 (desde "Mi cuenta" arriba a la derecha, una vez logueado). El usuario `admin` es el
@@ -99,14 +103,37 @@ vez en cuando: `npx wrangler d1 export horas-extra-db --remote --output backup.s
 
 ## Qué incluye
 
-- **Áreas**: cargan horas extra una por una o en lote subiendo un Excel (plantilla
-  descargable desde la pantalla de carga). Al escribir un legajo que ya tiene cargas
-  anteriores, nombre y apellido se autocompletan.
+- **Áreas/Carga**: cargan horas extra por mes (no por día — no hace falta esa
+  precisión) una por una o en lote subiendo un Excel (plantilla descargable desde la
+  pantalla de carga). Al escribir un legajo que ya tiene cargas anteriores, nombre y
+  apellido se autocompletan. No se pueden cargar meses futuros. La administración puede
+  limitar la carga a una ventana de días del mes (por ejemplo, del 1 al 10); fuera de
+  esa ventana, las áreas no pueden cargar (administración sí, siempre). Ni el tope ni la
+  posibilidad de "liberar" un legajo se les muestra a estos roles — si una carga se
+  rechaza por tope, ven un mensaje genérico sin detalles del mecanismo interno.
 - **Administración**: además de todo lo de las áreas (puede cargar horas eligiendo
   cualquier área), ve el listado consolidado de todas las áreas con filtros por área/
-  legajo/fecha y exporta a Excel; para el PDF/GDE abre una versión imprimible y usa
-  "Guardar como PDF" del navegador; define los topes mensuales (50%, 100% y combinado);
-  libera legajos puntuales para que puedan superar el tope; y gestiona los usuarios de
-  cada área.
+  legajo/mes y exporta a Excel; para el PDF/GDE abre una versión imprimible y usa
+  "Guardar como PDF" del navegador; define los topes mensuales (50%, 100% y combinado) y
+  la ventana de carga; libera legajos (temporal para un mes puntual, o permanente) para
+  que puedan superar el tope; y gestiona los usuarios de cada área.
 - Los topes se controlan por legajo y mes calendario; si se supera alguno la carga se
   rechaza con el detalle de qué tope se excedió, salvo que el legajo esté liberado.
+- **Remitos**: para que las mismas horas nunca se manden dos veces por GDE. Desde
+  "Remitos", administración junta las horas de un período/área en un documento con un
+  código único. Mientras está en **borrador** se puede imprimir y anular libremente. Al
+  **confirmarlo**, esas horas quedan bloqueadas para siempre (no se pueden borrar ni
+  entrar en otro remito). Si hace falta corregir un error, se puede **anular** un
+  remito (borrador o confirmado, con motivo obligatorio) y sus horas vuelven a estar
+  disponibles para un remito nuevo. Queda todo el historial accesible desde ese menú.
+
+## Cambiar el nombre de la URL
+
+La URL pública tiene la forma `<nombre-del-worker>.<subdominio-de-la-cuenta>.workers.dev`.
+El nombre del worker ya es "horas-extra" (se define en `wrangler.jsonc`); la parte que
+suele quedar con datos personales es el subdominio de la cuenta de Cloudflare, que se
+elige una vez al crear la cuenta y se puede cambiar desde el dashboard de Cloudflare →
+Workers & Pages → (ícono de cuenta / Account Home) → ahí aparece la opción de cambiar el
+subdominio `workers.dev`. Ese cambio aplica a todos los Workers de esa cuenta (en este
+caso solo hay uno). También se puede usar un dominio propio del municipio en vez del
+subdominio de Cloudflare, agregándolo como dominio personalizado del Worker.

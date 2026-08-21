@@ -3,6 +3,7 @@ import type { SessionUser } from "@/lib/auth";
 
 const roleLabel: Record<SessionUser["role"], string> = {
   area: "Área",
+  carga: "Carga",
   admin: "Administración",
 };
 

@@ -1,6 +1,6 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
-export type Role = "area" | "admin";
+export type Role = "area" | "carga" | "admin";
 
 async function getDb() {
   const { env } = await getCloudflareContext({ async: true });
@@ -19,7 +19,8 @@ export async function dbAll<T = unknown>(sql: string, ...params: unknown[]): Pro
   return results;
 }
 
-export async function dbRun(sql: string, ...params: unknown[]): Promise<void> {
+export async function dbRun(sql: string, ...params: unknown[]): Promise<{ lastRowId: number }> {
   const db = await getDb();
-  await db.prepare(sql).bind(...params).run();
+  const result = await db.prepare(sql).bind(...params).run();
+  return { lastRowId: result.meta.last_row_id };
 }

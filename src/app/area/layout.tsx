@@ -16,6 +16,7 @@ export default async function AreaLayout({ children }: { children: React.ReactNo
             ? [
                 { href: "/area", label: "Cargar horas" },
                 { href: "/admin/consolidado", label: "Listado consolidado" },
+                { href: "/admin/remitos", label: "Remitos" },
                 { href: "/admin", label: "Topes" },
                 { href: "/admin/liberar", label: "Liberar legajos" },
                 { href: "/admin/usuarios", label: "Usuarios" },

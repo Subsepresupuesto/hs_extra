@@ -101,8 +101,8 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 }
 
 export function homeForRole(role: Role) {
-  if (role === "area") return "/area";
-  return "/admin";
+  if (role === "admin") return "/admin";
+  return "/area";
 }
 
 export async function requireRole(

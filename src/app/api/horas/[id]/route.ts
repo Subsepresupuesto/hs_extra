@@ -8,14 +8,26 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { user } = auth;
   const { id } = await params;
 
-  const registro = await dbGet<{ id: number; area: string; cargadoPor: number; creadoFecha: string }>(
-    `SELECT id, area, cargado_por as cargadoPor, date(created_at) as creadoFecha
+  const registro = await dbGet<{
+    id: number;
+    area: string;
+    cargadoPor: number;
+    creadoFecha: string;
+    remitoId: number | null;
+  }>(
+    `SELECT id, area, cargado_por as cargadoPor, date(created_at) as creadoFecha, remito_id as remitoId
      FROM horas_extra WHERE id = ?`,
     id
   );
 
   if (!registro) {
     return NextResponse.json({ error: "El registro no existe." }, { status: 404 });
+  }
+  if (registro.remitoId) {
+    return NextResponse.json(
+      { error: "No se puede eliminar: ya forma parte de un remito. Anulá el remito primero." },
+      { status: 403 }
+    );
   }
 
   if (user.role === "area") {

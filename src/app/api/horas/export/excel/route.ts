@@ -24,11 +24,11 @@ export async function GET(req: NextRequest) {
     params.push(`%${legajo}%`);
   }
   if (desde) {
-    clauses.push("fecha >= ?");
+    clauses.push("periodo >= ?");
     params.push(desde);
   }
   if (hasta) {
-    clauses.push("fecha <= ?");
+    clauses.push("periodo <= ?");
     params.push(hasta);
   }
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";

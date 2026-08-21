@@ -10,10 +10,10 @@ export default async function AreaPage() {
   let areas: string[] = [];
   if (user.role === "admin") {
     const rows = await dbAll<{ area: string }>(
-      "SELECT DISTINCT area_name as area FROM users WHERE role = 'area' AND area_name IS NOT NULL AND activo = 1 ORDER BY area_name"
+      "SELECT DISTINCT area_name as area FROM users WHERE role IN ('area','carga') AND area_name IS NOT NULL AND activo = 1 ORDER BY area_name"
     );
     areas = rows.map((r) => r.area);
   }
 
-  return <AreaClient areaFija={user.areaName} areasDisponibles={areas} />;
+  return <AreaClient rol={user.role} areasDisponibles={areas} />;
 }

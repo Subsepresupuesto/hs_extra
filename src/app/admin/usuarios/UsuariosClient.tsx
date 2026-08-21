@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 type Usuario = {
   id: number;
   username: string;
-  role: "area" | "admin";
+  role: "area" | "carga" | "admin";
   areaName: string | null;
   activo: number;
   createdAt: string;
@@ -13,6 +13,7 @@ type Usuario = {
 
 const roleLabel: Record<Usuario["role"], string> = {
   area: "Área",
+  carga: "Carga (solo cargar, sin ver nada)",
   admin: "Administración",
 };
 
@@ -63,7 +64,7 @@ export default function UsuariosClient() {
           username: username.trim(),
           password,
           role,
-          areaName: role === "area" ? areaName.trim() : null,
+          areaName: role === "area" || role === "carga" ? areaName.trim() : null,
         }),
       });
       const data = (await res.json()) as { error?: string };
@@ -136,10 +137,11 @@ export default function UsuariosClient() {
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
             >
               <option value="area">Área</option>
+              <option value="carga">Carga (solo cargar, sin ver nada)</option>
               <option value="admin">Administración</option>
             </select>
           </div>
-          {role === "area" && (
+          {(role === "area" || role === "carga") && (
             <div>
               <label className="text-sm font-medium text-slate-700">Nombre del área</label>
               <input
