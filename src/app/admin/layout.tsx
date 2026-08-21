@@ -15,7 +15,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         nav={[
           { href: "/area", label: "Cargar horas" },
           { href: "/admin/consolidado", label: "Listado consolidado" },
-          { href: "/admin/remitos", label: "Remitos" },
+          { href: "/remitos", label: "Remitos" },
           { href: "/admin", label: "Topes" },
           { href: "/admin/liberar", label: "Liberar legajos" },
           { href: "/admin/usuarios", label: "Usuarios" },

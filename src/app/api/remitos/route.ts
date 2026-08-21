@@ -3,22 +3,35 @@ import { requireRole } from "@/lib/auth";
 import { crearRemito, listarRemitos } from "@/lib/remitos";
 
 export async function GET() {
-  const auth = await requireRole(["admin"]);
+  const auth = await requireRole(["area", "admin"]);
   if ("error" in auth) return auth.error;
+  const { user } = auth;
 
-  const remitos = await listarRemitos();
+  const remitos = await listarRemitos(user.role === "area" ? user.areaName : null);
   return NextResponse.json({ remitos });
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireRole(["admin"]);
+  const auth = await requireRole(["area", "admin"]);
   if ("error" in auth) return auth.error;
   const { user } = auth;
 
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
-  const area = body?.area ? String(body.area).trim() : null;
   const desde = String(body?.desde ?? "").trim();
   const hasta = String(body?.hasta ?? "").trim();
+
+  let area: string | null;
+  if (user.role === "area") {
+    if (!user.areaName) {
+      return NextResponse.json(
+        { error: "Tu usuario no tiene un área asignada. Contactá a la administración." },
+        { status: 400 }
+      );
+    }
+    area = user.areaName;
+  } else {
+    area = body?.area ? String(body.area).trim() : null;
+  }
 
   if (!/^\d{4}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}$/.test(hasta)) {
     return NextResponse.json({ error: "Rango de meses inválido." }, { status: 400 });

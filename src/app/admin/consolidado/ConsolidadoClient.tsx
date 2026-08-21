@@ -129,7 +129,7 @@ export default function ConsolidadoClient() {
           </a>
           <p className="text-xs text-slate-500">
             Para mandar por GDE sin repetir horas, usá{" "}
-            <a href="/admin/remitos" className="text-red-700 underline font-medium">
+            <a href="/remitos" className="text-red-700 underline font-medium">
               Remitos
             </a>{" "}
             en vez de esta vista previa.

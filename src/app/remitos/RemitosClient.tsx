@@ -29,7 +29,15 @@ const estadoLabel: Record<Remito["estado"], string> = {
   anulado: "Anulado",
 };
 
-export default function RemitosClient({ areas }: { areas: string[] }) {
+export default function RemitosClient({
+  areaFija,
+  areasDisponibles,
+}: {
+  areaFija: string | null;
+  areasDisponibles: string[];
+}) {
+  const esAdmin = areaFija === null;
+
   const [remitos, setRemitos] = useState<Remito[]>([]);
   const [cargando, setCargando] = useState(true);
 
@@ -65,12 +73,16 @@ export default function RemitosClient({ areas }: { areas: string[] }) {
   async function handleGenerar(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (esAdmin === false && !areaFija) {
+      setError("Tu usuario no tiene un área asignada.");
+      return;
+    }
     setEnviando(true);
     try {
       const res = await fetch("/api/remitos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ area: area || null, desde, hasta }),
+        body: JSON.stringify({ area: esAdmin ? area || null : areaFija, desde, hasta }),
       });
       const data = (await res.json()) as { error?: string; remito?: { id: number } };
       if (!res.ok) {
@@ -126,21 +138,32 @@ export default function RemitosClient({ areas }: { areas: string[] }) {
           anular libremente; al <b>confirmarlo</b> esas horas quedan bloqueadas para siempre.
         </p>
         <form onSubmit={handleGenerar} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label className="text-sm font-medium text-slate-700">Área</label>
-            <select
-              value={area}
-              onChange={(e) => setArea(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            >
-              <option value="">Todas</option>
-              {areas.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-          </div>
+          {esAdmin ? (
+            <div>
+              <label className="text-sm font-medium text-slate-700">Área</label>
+              <select
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              >
+                <option value="">Todas</option>
+                {areasDisponibles.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div>
+              <label className="text-sm font-medium text-slate-700">Área</label>
+              <input
+                value={areaFija ?? ""}
+                disabled
+                className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
+              />
+            </div>
+          )}
           <div>
             <label className="text-sm font-medium text-slate-700">Desde</label>
             <input
@@ -179,7 +202,9 @@ export default function RemitosClient({ areas }: { areas: string[] }) {
       </section>
 
       <section className="bg-white border border-slate-200 rounded-xl p-6">
-        <h2 className="text-base font-semibold text-slate-900 mb-4">Remitos generados</h2>
+        <h2 className="text-base font-semibold text-slate-900 mb-4">
+          {esAdmin ? "Remitos generados" : "Remitos de tu área"}
+        </h2>
         {cargando ? (
           <p className="text-sm text-slate-500">Cargando...</p>
         ) : remitos.length === 0 ? (
@@ -190,7 +215,7 @@ export default function RemitosClient({ areas }: { areas: string[] }) {
               <thead>
                 <tr className="text-left text-slate-500 border-b border-slate-200">
                   <th className="py-2 pr-4">Código</th>
-                  <th className="py-2 pr-4">Área</th>
+                  {esAdmin && <th className="py-2 pr-4">Área</th>}
                   <th className="py-2 pr-4">Período</th>
                   <th className="py-2 pr-4">Estado</th>
                   <th className="py-2 pr-4">Generado</th>
@@ -201,7 +226,7 @@ export default function RemitosClient({ areas }: { areas: string[] }) {
                 {remitos.map((r) => (
                   <tr key={r.id} className="border-b border-slate-100">
                     <td className="py-2 pr-4 font-medium">{r.codigo}</td>
-                    <td className="py-2 pr-4">{r.area ?? "Todas"}</td>
+                    {esAdmin && <td className="py-2 pr-4">{r.area ?? "Todas"}</td>}
                     <td className="py-2 pr-4">
                       {r.desde} a {r.hasta}
                     </td>

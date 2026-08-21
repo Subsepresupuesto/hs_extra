@@ -12,11 +12,12 @@ const estadoLabel: Record<string, string> = {
 export default async function ImprimirRemitoPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (user.role !== "admin") redirect("/area");
+  if (user.role === "carga") redirect("/area");
 
   const { id } = await params;
   const remito = await obtenerRemito(Number(id));
   if (!remito) notFound();
+  if (user.role === "area" && remito.area !== user.areaName) redirect("/remitos");
   const items = await itemsRemito(Number(id));
 
   const total50 = items.reduce((acc, f) => acc + f.horas50, 0);

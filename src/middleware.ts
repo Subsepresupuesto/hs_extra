@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const SESSION_COOKIE = "hs_extra_session";
 
-const rutasProtegidas = ["/area", "/admin", "/perfil", "/imprimir"];
+const rutasProtegidas = ["/area", "/admin", "/perfil", "/imprimir", "/remitos"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -22,5 +22,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/area/:path*", "/admin/:path*", "/perfil/:path*", "/imprimir/:path*"],
+  matcher: ["/area/:path*", "/admin/:path*", "/perfil/:path*", "/imprimir/:path*", "/remitos/:path*"],
 };

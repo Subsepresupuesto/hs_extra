@@ -72,14 +72,17 @@ export async function crearRemito(params: {
   return { ok: true, remito };
 }
 
-export async function listarRemitos(): Promise<Remito[]> {
+export async function listarRemitos(area: string | null = null): Promise<Remito[]> {
+  const where = area ? "WHERE area = ?" : "";
+  const params = area ? [area] : [];
   return dbAll<Remito>(
     `SELECT id, codigo, area, desde, hasta, estado,
             creado_por_usuario as creadoPorUsuario, created_at as createdAt,
             confirmado_por_usuario as confirmadoPorUsuario, confirmado_at as confirmadoAt,
             anulado_por_usuario as anuladoPorUsuario, anulado_at as anuladoAt,
             motivo_anulacion as motivoAnulacion
-     FROM remitos ORDER BY created_at DESC`
+     FROM remitos ${where} ORDER BY created_at DESC`,
+    ...params
   );
 }
 
